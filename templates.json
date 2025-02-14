@@ -1,0 +1,13 @@
+{
+    "$GPGGA": {
+        "keys": ["UTC", "latitude", "longitude", "altitude", "satellites"],
+        "indexes": ["1~truncate/0/|slice/2/|join/:/|~", 2, 4, 9, 7],
+        "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n"
+    },
+
+    "$GPGSA": {
+        "keys": ["type_mode", "mode", "satellites", "PDOP", "HDOP", "VDOP"],
+        "indexes": [1, 2, "3:14", 15, 16, 17],
+        "out_msg_template": "{type} Type:{type_mode} Mode:{mode} Satellites ID's:{satellites} PDOP:{PDOP} HDOP:{HDOP} VDOP:{VDOP}\n"
+    }
+}
