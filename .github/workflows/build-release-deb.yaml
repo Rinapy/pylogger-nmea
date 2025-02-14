@@ -1,0 +1,77 @@
+name: Build And Release Debian Package
+
+on:
+  push:
+    branches:
+      - debian-pkg
+  pull_request:
+    branches:
+      - debian-pkg
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event.head_commit.message == 'build' || github.event.head_commit.message == 'new release'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up dependencies
+        run: |
+          ls -a
+          sudo apt-get update
+          sudo apt-get install -y grep
+          sudo apt-get install -y python3 python3-virtualenv python3-setuptools dh-virtualenv build-essential debhelper
+
+      - name: Build the package
+        run: |
+          chmod +x debian/rules
+          dpkg-buildpackage -us -uc
+          ls -a
+          rm -rf unreleased_builds/before_last_build
+          ls -a
+          mkdir -p unreleased_builds/before_last_build
+          ls -a
+          mv unreleased_builds/last_build/pyloggernmea_*.deb unreleased_builds/before_last_build || true
+          ls -a
+          rm -rf unreleased_builds/last_build
+          ls -a
+          mkdir -p unreleased_builds/last_build
+          ls -a
+          mv ../pyloggernmea_*.deb unreleased_builds/last_build
+          ls unreleased_builds/last_build
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add unreleased_builds/last_build/*.deb
+          git commit -m "Добавлен новый .deb пакет" || echo "Нет изменений для коммита"
+          git push origin debian-pkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create_release:
+    runs-on: ubuntu-latest
+    if: github.event.head_commit.message == 'new release'
+    needs: build
+    steps:
+      - name: Get version from file
+        id: get_version
+        run: echo "::set-output name=VERSION::$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)"
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}  # Используем версию из предыдущего шага
+          release_name: Release v${{ steps.get_version.outputs.VERSION }}  # Используем версию для имени релиза
+          body: |
+            Автоматически сгенерированный релиз с собранными .deb пакетами.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload package to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: /unreleased_builds/last_build/*.deb  # Укажите путь к файлам .deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

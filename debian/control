@@ -1,0 +1,12 @@
+Source: pyloggernmea
+Section: utils
+Priority: optional
+Maintainer: Rinapy <roma.minaev0@gmail.com>
+Build-Depends: python3, dh-virtualenv (>= 0.8), python3-setuptools, build-essential, debhelper, python3-virtualenv
+Standards-Version: 3.9.6
+Homepage: https://github.com/rinapy/pyloggernmea
+
+Package: pyloggernmea
+Architecture: any
+Depends: python3 (>= 3.7)
+Description: Utility for logging and decoding NMEA messages.

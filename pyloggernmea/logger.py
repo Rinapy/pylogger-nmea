@@ -2,11 +2,15 @@ import json
 from typing import Union
 from argparse import ArgumentParser, Namespace
 import time
+import os
+import daemon
 
 import serial
 
-from line_parser import LineParser
+from .line_parser import LineParser
 
+# Получить абсолютный путь к текущему скрипту
+script_path = os.path.abspath(__file__)
 
 def parse_args() -> Namespace:
     parser = ArgumentParser()
@@ -58,6 +62,21 @@ def parse_args() -> Namespace:
         help="Timeout in seconds for attempt to reconnect to the port",
     )
 
+    parser.add_argument(
+        "-tp",
+        "--template_path",
+        type=str,
+        default=None,
+        help="Path to the template file",
+    )
+    
+    parser.add_argument(
+        "-d",
+        "--daemon",
+        action="store_true",
+        help="Run as daemon",
+    )
+
     return parser.parse_args()
 
 
@@ -93,13 +112,31 @@ class NMEAParser:
         self.input = input
         self.output = output
         self.filter = filter
-        self.template_path = template_path or "templates.json"
+        self.template_path = template_path or os.path.join(os.path.dirname(script_path), "templates.json")
         self.message_parsers = self._load_templates()
         self.timeout = timeout
 
     def _load_templates(self) -> dict:
-        with open(self.template_path, 'r') as f:
-            templates = json.load(f)
+        if not os.path.exists(self.template_path):
+            templates = {
+                        "$GPGGA": {
+                            "keys": ["UTC", "latitude", "longitude", "altitude", "satellites"],
+                            "indexes": ["1~truncate/0/|slice/2/|join/:/|~", 2, 4, 9, 7],
+                            "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n"
+                        },
+
+                        "$GPGSA": {
+                            "keys": ["type_mode", "mode", "satellites", "PDOP", "HDOP", "VDOP"],
+                            "indexes": [1, 2, "3:14", 15, 16, 17],
+                            "out_msg_template": "{type} Type:{type_mode} Mode:{mode} Satellites ID's:{satellites} PDOP:{PDOP} HDOP:{HDOP} VDOP:{VDOP}\n"
+                        }
+                    }
+            with open(self.template_path, 'w') as f:
+                f.write(json.dumps(templates, indent=4))
+        else:
+            with open(self.template_path, 'r') as f:
+                templates = json.load(f)
+        
 
         # Преобразуем строковые slice в объекты slice
         for message_type in templates:
@@ -151,6 +188,7 @@ class NMEAParser:
                         if line.startswith(self.filter):
                             line = self.decode_line(line)
                             f.write(line)
+                            print(line)
 
                 except serial.SerialException as e:
                     print(f"Error with serial port: {e}")
@@ -203,21 +241,38 @@ class NMEAParser:
 
 def start_app() -> None:
     args = parse_args()
-    print(f'Logger args: Port: {args.port}, Baudrate: {args.baudrate}, Output: {args.output}, Filter: {"All" if args.filter == "" else args.filter}, Input: {args.input}, Timeout: {args.timeout}')
-    parser = NMEAParser(
-        args.port,
-        args.baudrate,
-        args.output,
-        args.filter,
-        args.input,
-        timeout=args.timeout
-    )
-    parser.start()
+    print(f'Logger args:\n - Port: {args.port}\n - Baudrate: {args.baudrate}\n - Output: {args.output}\n - Filter: {"All" if args.filter == "" else args.filter}\n - Input: {args.input}\n - Timeout: {args.timeout}')
 
+    if args.daemon:
+        with daemon.DaemonContext():  # Запускаем в контексте дамона
+            parser = NMEAParser(
+                args.port,
+                args.baudrate,
+                args.output,
+                args.filter,
+                args.input,
+                args.template_path,
+                args.timeout
+            )
+            parser.start()
+    else:
+        parser = NMEAParser(
+            args.port,
+            args.baudrate,
+            args.output,
+            args.filter,
+            args.input,
+            args.template_path,
+            args.timeout
+        )
+        parser.start()
 
-if __name__ == "__main__":
+def main():
     print("Starting logger...", "Developer TG: @Rinapy", "GitHub: https://github.com/rinapy")
     try:
         start_app()
     except KeyboardInterrupt:
         print("Logger stopped with User interrupt")
+
+if __name__ == "__main__":
+    main()
