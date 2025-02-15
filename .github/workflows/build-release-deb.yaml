@@ -54,7 +54,9 @@ jobs:
     steps:
       - name: Get version from file
         id: get_version
-        run: echo "::set-output name=VERSION::$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)"
+        run: |
+          ls -a
+          echo "::set-output name=VERSION::$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)"
 
       - name: Create Release
         id: create_release
