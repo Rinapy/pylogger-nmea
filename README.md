@@ -72,21 +72,19 @@ $GPRMC Unsupported data
 $GPVTG Unsupported data
 ```
 
-## Запуск
-Debian 10:
+## Установка
+Загрузить из релизов небходимую версию
 ```
-sudo apt install build-essential
-python -m nuitka --standalone --onefile --enable-console logger.py
+wget https://github.com/pyloggernmea/pyloggernmea/releases/download/{CHOSEN_VERSION}/pyloggernmea_{CHOSEN_VERSION}_amd64.deb
+dpkg -i pyloggernmea_{CHOSEN_VERSION}_amd64.deb
+```
+Не обявленные в релизах.
+```
+git clone --branch debian-pkg https://github.com/pyloggernmea/pyloggernmea.git
+cd pyloggernmea/unrelease_builds
+dpkg -i pyloggernmea_*.deb
 ```
 
-Debina 10 v2:
-```
-sudo apt install python3-venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python logger.py --port ttyS0 --baudrate 9600 --output log.txt --filter GPGGA # Flags optional
-```
 
 
 
