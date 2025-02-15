@@ -51,15 +51,15 @@ jobs:
       - name: Get version from file
         id: get_version
         run: |
-          echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9]+\.[0-9]+\.[0-9]+' debian/changelog)" >> $GITHUB_ENV
-          echo $GITHUB_ENV
+          VERSION=$(grep -oP 'pyloggernmea \(\K[0-9]+\.[0-9]+\.[0-9]+' debian/changelog)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ VERSION }}  # Используем версию из предыдущего шага
-          name: Release v${{ VERSION }}  # Используем версию для имени релиза
+          tag_name: v${{ env.VERSION }}  # Используем версию из окружения
+          name: Release v${{ env.VERSION }}  # Используем версию для имени релиза
           body: |
             Автоматически сгенерированный релиз с собранными .deb пакетами.
           files: |
