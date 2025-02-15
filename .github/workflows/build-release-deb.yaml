@@ -63,9 +63,7 @@ jobs:
           body: |
             Автоматически сгенерированный релиз с собранными .deb пакетами.
           files: |
-            path/to/your/package.deb
-            path/to/another/package.deb
-              env:
+            unreleased_builds/last_build/*.deb
           token: ${{ secrets.PUSH_TOKEN }}
 
       - name: Upload package to Release
