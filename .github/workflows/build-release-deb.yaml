@@ -64,6 +64,6 @@ jobs:
             Автоматически сгенерированный релиз с собранными .deb пакетами.
           files: |
             unreleased_builds/last_build/*.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
 
