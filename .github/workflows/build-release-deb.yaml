@@ -51,7 +51,8 @@ jobs:
       - name: Get version from file
         id: get_version
         run: |
-          echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)" >> $GITHUB_ENV
+          echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9]+\.[0-9]+\.[0-9]+' debian/changelog)" >> $GITHUB_ENV
+          echo $GITHUB_ENV
 
       - name: Create Release
         id: create_release
@@ -63,12 +64,6 @@ jobs:
             Автоматически сгенерированный релиз с собранными .deb пакетами.
           files: |
             unreleased_builds/last_build/*.deb
-            env:
-              GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
-
-      - name: Upload package to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: /unreleased_builds/last_build/*.deb  # Укажите путь к файлам .deb
         env:
           GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+
