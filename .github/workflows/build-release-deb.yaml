@@ -67,7 +67,7 @@ jobs:
           body: |
             Автоматически сгенерированный релиз с собранными .deb пакетами.
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
 
       - name: Upload package to Release
         uses: softprops/action-gh-release@v1
