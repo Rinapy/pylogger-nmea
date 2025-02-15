@@ -28,17 +28,11 @@ jobs:
         run: |
           chmod +x debian/rules
           dpkg-buildpackage -us -uc
-          ls -a
           rm -rf unreleased_builds/before_last_build
-          ls -a
           mkdir -p unreleased_builds/before_last_build
-          ls -a
           mv unreleased_builds/last_build/pyloggernmea_*.deb unreleased_builds/before_last_build || true
-          ls -a
           rm -rf unreleased_builds/last_build
-          ls -a
           mkdir -p unreleased_builds/last_build
-          ls -a
           mv ../pyloggernmea_*.deb unreleased_builds/last_build
           ls unreleased_builds/last_build
           git config user.name "GitHub Action"
@@ -54,7 +48,7 @@ jobs:
     steps:
       - name: Get version from file
         id: get_version
-        run: echo "::set-output name=VERSION::$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)"
+        run: echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)" >> $GITHUB_ENV
 
       - name: Create Release
         id: create_release
