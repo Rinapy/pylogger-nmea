@@ -48,7 +48,9 @@ jobs:
     steps:
       - name: Get version from file
         id: get_version
-        run: echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)" >> $GITHUB_ENV
+        run: |
+          ls -a
+          echo "VERSION=$(grep -oP 'pyloggernmea \(\K[0-9.]+(?=\))' debian/changelog)" >> $GITHUB_ENV
 
       - name: Create Release
         id: create_release
