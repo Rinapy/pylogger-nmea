@@ -58,8 +58,8 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}  # Используем версию из предыдущего шага
-          name: Release v${{ steps.get_version.outputs.VERSION }}  # Используем версию для имени релиза
+          tag_name: v${{ VERSION }}  # Используем версию из предыдущего шага
+          name: Release v${{ VERSION }}  # Используем версию для имени релиза
           body: |
             Автоматически сгенерированный релиз с собранными .deb пакетами.
           files: |
