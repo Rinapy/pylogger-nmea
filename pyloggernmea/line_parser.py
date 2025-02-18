@@ -36,14 +36,9 @@ class LineParser:
                         for value in data
                     ]
 
-                if isinstance(data, str):
-                    if not data.replace('.', '').isdigit():
-                        raise ValueError(
-                            'template not valid truncate operation for string'
-                        )
-                    data = float(data)
+                
 
-                if isinstance(data, (float, int)):
+                if isinstance(data, (float, int, str)):
                     data = self.__truncate(data, truncate_value)
             if 'join' in operation:
                 sep = operation.split('/')[1]
@@ -98,5 +93,8 @@ class LineParser:
 
 if __name__ == '__main__':
 
-    parser = LineParser("134731.361", "~truncate/0/|slice/2/|join/:/|~")
+    parser = LineParser("054010.00", "~truncate/0/|slice/2/|join/:/|~") # 54:01:0 
     print(parser.parse())
+    parser = LineParser("134731.361", "~truncate/0/|slice/2/|join/:/|~") # 13:47:31
+    print(parser.parse())
+    
