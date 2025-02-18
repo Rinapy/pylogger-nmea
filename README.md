@@ -15,6 +15,7 @@
 - --filter: Фильтр для выбора нужных типов сообщений
 - --input: Путь к файлу для чтения данных
 - --timeout: Время ожидания ответа на COM порт (0 - без ограничения)
+- --daemon: Запуск в фоновом режиме
 
 
 ## Возможности
@@ -75,17 +76,51 @@ $GPVTG Unsupported data
 ## Запуск
 Debian 10:
 ```
-sudo apt install build-essential
-python -m nuitka --standalone --onefile --enable-console logger.py
+dpkg -i pyloggernmea*.deb
+ln /opt/venvs/pyloggernmea/bin/pyloggernmea /usr/bin/pyloggernmea
+pyloggernmea -t 5 -p /path/you/port -tp /path/to/tempalte.json
 ```
 
-Debina 10 v2:
+# Template.json
 ```
-sudo apt install python3-venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python logger.py --port ttyS0 --baudrate 9600 --output log.txt --filter GPGGA # Flags optional
+{
+    "$GPGGA": {
+        "keys": [ # "Это те ключи которые вы связываете с индексами
+            "UTC",
+            "latitude",
+            "longitude",
+            "altitude",
+            "satellites"
+        ],
+        "indexes": [ # Индексы идут от 0, где 0 это тег $GPGGA, а далее та информация котору этот тег несёт
+            "1~truncate/0/|slice/2/|join/:/|~", # Тип записи для индекса которму необходимо особоее форматироавние входящяя по тегу 122341.321 выход 12:23:41
+            2,
+            4,
+            9,
+            7
+        ],
+        "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n" # Шаблон выходных данных где вы указываете ключи, {type} - прежустановленый ключ который несёт в себе тег $GPGGA
+    },
+    "$GPGSA": {
+        "keys": [
+            "type_mode",
+            "mode",
+            "satellites",
+            "PDOP",
+            "HDOP",
+            "VDOP"
+        ],
+        "indexes": [
+            1,
+            2,
+            "3:14", # Тип записи записи когда есть необходимость собрать несколько ииндексов через ", " под один ключ
+            15,
+            16,
+            17
+        ],
+        "out_msg_template": "{type} Type:{type_mode} Mode:{mode} Satellites ID's:{satellites} PDOP:{PDOP} HDOP:{HDOP} VDOP:{VDOP}\n" # 
+    }
+}
 ```
 
 
