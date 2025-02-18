@@ -15,6 +15,7 @@
 - --filter: Фильтр для выбора нужных типов сообщений
 - --input: Путь к файлу для чтения данных
 - --timeout: Время ожидания ответа на COM порт (0 - без ограничения)
+- --daemon: Запуск в фоновом режиме
 
 
 ## Возможности
@@ -72,19 +73,55 @@ $GPRMC Unsupported data
 $GPVTG Unsupported data
 ```
 
-## Установка
-Загрузить из релизов небходимую версию
+## Запуск
+Debian 10:
 ```
-wget https://github.com/pyloggernmea/pyloggernmea/releases/download/{CHOSEN_VERSION}/pyloggernmea_{CHOSEN_VERSION}_amd64.deb
-dpkg -i pyloggernmea_{CHOSEN_VERSION}_amd64.deb
-```
-Не обявленные в релизах.
-```
-git clone --branch debian-pkg https://github.com/pyloggernmea/pyloggernmea.git
-cd pyloggernmea/unrelease_builds
-dpkg -i pyloggernmea_*.deb
+dpkg -i pyloggernmea*.deb
+ln /opt/venvs/pyloggernmea/bin/pyloggernmea /usr/bin/pyloggernmea
+pyloggernmea -t 5 -p /path/you/port -tp /path/to/tempalte.json
 ```
 
+# Template.json
+```
+{
+    "$GPGGA": {
+        "keys": [ # "Это те ключи которые вы связываете с индексами
+            "UTC",
+            "latitude",
+            "longitude",
+            "altitude",
+            "satellites"
+        ],
+        "indexes": [ # Индексы идут от 0, где 0 это тег $GPGGA, а далее та информация котору этот тег несёт
+            "1~truncate/0/|slice/2/|join/:/|~", # Тип записи для индекса которму необходимо особоее форматироавние входящяя по тегу 122341.321 выход 12:23:41
+            2,
+            4,
+            9,
+            7
+        ],
+        "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n" # Шаблон выходных данных где вы указываете ключи, {type} - прежустановленый ключ который несёт в себе тег $GPGGA
+    },
+    "$GPGSA": {
+        "keys": [
+            "type_mode",
+            "mode",
+            "satellites",
+            "PDOP",
+            "HDOP",
+            "VDOP"
+        ],
+        "indexes": [
+            1,
+            2,
+            "3:14", # Тип записи записи когда есть необходимость собрать несколько ииндексов через ", " под один ключ
+            15,
+            16,
+            17
+        ],
+        "out_msg_template": "{type} Type:{type_mode} Mode:{mode} Satellites ID's:{satellites} PDOP:{PDOP} HDOP:{HDOP} VDOP:{VDOP}\n" # 
+    }
+}
+```
 
 
 
