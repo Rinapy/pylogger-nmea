@@ -235,7 +235,7 @@ class NMEAParser:
                     try:
                         data[key] = data_list[idx]
                     except IndexError:
-                        return f"{message_type} Template error, index for tag {key} is out of range\n"
+                        return f"{message_type} Template error, index {idx} for tag {key} is out of range\n"
             data["type"] = message_type
             return parser["out_msg_template"].format(**data)
 
