@@ -232,7 +232,10 @@ class NMEAParser:
                     idx, operation = int(idx.split('~')[0]), idx.split('~')[1]
                     data[key] = LineParser(data_list[idx], operation).parse()
                 else:
-                    data[key] = data_list[idx]
+                    try:
+                        data[key] = data_list[idx]
+                    except IndexError:
+                        return f"{message_type} Template error, index for tag {key} is out of range\n"
             data["type"] = message_type
             return parser["out_msg_template"].format(**data)
 
