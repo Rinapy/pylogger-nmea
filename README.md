@@ -19,8 +19,7 @@
 
 
 ## Возможности
-- Настраиваемые шаблоны вывода через templates.json
-- Возможность компиляции в исполняемый файл с помощью Nuitka
+- Настраиваемые шаблоны вывода через templates.json учитывая условные выражения
 - Поддержка основных типов NMEA сообщений (GGA, RMC, VTG и др.)
 - Настраиваемые параметры соединения (COM порт, скорость)
 - Гибкая система логирования с указанием пути сохранения
@@ -35,7 +34,35 @@
     "$GPGGA": {
         "keys": ["UTC", "latitude", "longitude", "altitude", "satellites"],
         "indexes": [1, 2, 4, 9, 7],
-        "template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n"
+        "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n"
+    },
+    "$GNGGA": {
+        "keys": [
+            "time",
+            "latitude",
+            "longitude",
+            "fix_quality",
+            "horizontal_dilution"
+        ],
+        "indexes": [
+            "1~truncate/0/|slice/2/|join/:/|~",
+            2,
+            4,
+            6, 
+            8
+        ],
+        "out_msg_template": "{time} {'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if fix_quality == '' else fix_quality} {'n' if horizontal_dilution == '' else horizontal_dilution} "
+    },
+    "$GNRMC": {
+        "keys": [
+            "status",
+            "speed"
+        ],
+        "indexes": [
+            2,
+            7 
+        ],
+        "out_msg_template": "{time} {'n' if status == '' else status} {'n' if speed == '' else speed}"
     }
 }
 ```
