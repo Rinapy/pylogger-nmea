@@ -47,7 +47,6 @@ def parse_args() -> Namespace:
         type=str,
         default="logfile.log",
         help="Output file",
-
     )
     parser.add_argument(
         "-f",
