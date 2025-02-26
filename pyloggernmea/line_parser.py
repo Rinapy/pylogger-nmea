@@ -2,6 +2,7 @@ from typing import Union
 
 
 class LineParser:
+
     def __init__(self,data:str, line: str):
         self.data = data
         self.line = line

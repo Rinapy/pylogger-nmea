@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.event.head_commit.message == 'build' || github.event.head_commit.message == 'new release'
 
     steps:
@@ -42,7 +42,7 @@ jobs:
           git push origin debian-pkg
 
   create_release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.event.head_commit.message == 'new release'
     needs: build
     steps:
