@@ -10,7 +10,7 @@ else:
 
 import serial
 
-from line_parser import LineParser
+from .line_parser import LineParser
 
 # Получить абсолютный путь к текущему скрипту
 script_path = os.path.abspath(__file__)
