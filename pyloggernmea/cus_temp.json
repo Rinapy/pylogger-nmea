@@ -1,42 +1,30 @@
 {
-    "$GNRMC": {
+    "$GNGGA": {
         "keys": [
+            "time",
             "latitude",
             "longitude",
+            "fix_quality",
+            "horizontal_dilution"
+        ],
+        "indexes": [
+            "1~truncate/0/|slice/2/|join/:/|~",
+            2,
+            4,
+            6, 
+            8
+        ],
+        "out_msg_template": "{time} {'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if fix_quality == '' else fix_quality} {'n' if horizontal_dilution == '' else horizontal_dilution} "
+    },
+    "$GNRMC": {
+        "keys": [
+            "status",
             "speed"
         ],
         "indexes": [
-            3,
-            5,
-            7
-        ],
-        "out_msg_template": "{'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if speed == '' else speed} "
-    },
-    "$GNGGA": {
-        "keys": [
-            "latitude",
-            "longitude",
-            "error"
-        ],
-        "indexes": [
             2,
-            4,
-            8
+            7 
         ],
-        "out_msg_template": "{'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if error == '' else error} "
-    },
-    "$GPGSV": {
-        "keys": [
-            "system"
-        ],
-        "indexes": [],
-        "out_msg_template": "GPS\n"
-    },
-    "$GLGSV": {
-        "keys": [
-            "system"
-        ],
-        "indexes": [],
-        "out_msg_template": "GLONASS "
+        "out_msg_template": "{time} {'n' if status == '' else status} {'n' if speed == '' else speed}"
     }
 }
