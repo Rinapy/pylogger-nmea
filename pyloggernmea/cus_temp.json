@@ -1,0 +1,42 @@
+{
+    "$GNRMC": {
+        "keys": [
+            "latitude",
+            "longitude",
+            "speed"
+        ],
+        "indexes": [
+            3,
+            5,
+            7
+        ],
+        "out_msg_template": "{'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if speed == '' else speed} "
+    },
+    "$GNGGA": {
+        "keys": [
+            "latitude",
+            "longitude",
+            "error"
+        ],
+        "indexes": [
+            2,
+            4,
+            8
+        ],
+        "out_msg_template": "{'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if error == '' else error} "
+    },
+    "$GPGSV": {
+        "keys": [
+            "system"
+        ],
+        "indexes": [],
+        "out_msg_template": "GPS\n"
+    },
+    "$GLGSV": {
+        "keys": [
+            "system"
+        ],
+        "indexes": [],
+        "out_msg_template": "GLONASS "
+    }
+}
