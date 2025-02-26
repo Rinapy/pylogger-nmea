@@ -14,17 +14,25 @@
             6, 
             8
         ],
-        "out_msg_template": "{time} {'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if fix_quality == '' else fix_quality} {'n' if horizontal_dilution == '' else horizontal_dilution} "
+        "out_msg_template": "\n{time} {'n' if latitude == '' else latitude} {'n' if longitude == '' else longitude} {'n' if horizontal_dilution == '' else horizontal_dilution} "
     },
     "$GNRMC": {
         "keys": [
-            "status",
             "speed"
         ],
         "indexes": [
-            2,
             7 
         ],
-        "out_msg_template": "{time} {'n' if status == '' else status} {'n' if speed == '' else speed}"
+        "out_msg_template": "{'n' if speed == '' else speed}"
+    },
+    "$GNGSA": {
+        "keys": [
+            "satellites"
+        ],
+        "indexes": [
+            "3:14"
+
+        ],
+        "out_msg_template": "{_check_satellites(satellites)} "
     }
 }

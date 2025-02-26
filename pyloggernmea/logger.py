@@ -162,17 +162,27 @@ class NMEAParser:
         return templates
 
     def _process_template(self, template: str, data: dict) -> str:
-        """Обрабатывает шаблон с условными выражениями."""
+        """Обрабатывает шаблон с условными выражениями и вызовами функций."""
         result = template
         import re
         
         # Находим все условные выражения в шаблоне
-        pattern = r"\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' or ([a-zA-Z_][a-zA-Z0-9_]*) == 0 else ([a-zA-Z_][a-zA-Z0-9_]*)\}|\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' else ([a-zA-Z_][a-zA-Z0-9_]*)\}"
+        pattern = r"\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' or ([a-zA-Z_][a-zA-Z0-9_]*) == 0 else ([a-zA-Z_][a-zA-Z0-9_]*)\}|\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' else ([a-zA-Z_][a-zA-Z0-9_]*)\}|\{([a-zA-Z_][a-zA-Z0-9_]*)\(([a-zA-Z_][a-zA-Z0-9_]*)\)\}"
         matches = re.finditer(pattern, template)
         
         # Заменяем каждое условное выражение его значением
         for match in matches:
-            if match.group(1) is not None:  # Это выражение с проверкой на пустоту и 0
+            if match.group(6) is not None:  # Это вызов функции
+                func_name = match.group(6)
+                param_name = match.group(7)
+                if hasattr(self, func_name) and param_name in data:
+                    func = getattr(self, func_name)
+                    try:
+                        result_value = func(data[param_name])
+                        result = result.replace(match.group(0), str(result_value))
+                    except Exception as e:
+                        print(f"Error calling function {func_name}: {e}")
+            elif match.group(1) is not None:  # Это выражение с проверкой на пустоту и 0
                 var_name = match.group(1)
                 if var_name in data:
                     value = data[var_name]
@@ -188,14 +198,18 @@ class NMEAParser:
         return result
 
     def start(self) -> None:
-        print(self.input)
         if self.input:
             self.output_lines = []
             with open(self.input, "r") as f:
+                old_tag = ''
                 for line in f:
                     tag = line.split(',')[0].lstrip('$')
                     if tag in self.filter or len(self.filter) == 0:
-                        self.output_lines.append(self.decode_line(line))
+                        if tag == old_tag:
+                            pass
+                        else:
+                            old_tag = tag
+                            self.output_lines.append(self.decode_line(line))
             with open(self.output, "w") as f:
                 for line in self.output_lines:
                     f.write(line)
@@ -215,6 +229,7 @@ class NMEAParser:
 
 
             with open(self.output, "a") as f:
+                old_tag = ''
                 while True:
                     try:
             
@@ -227,12 +242,17 @@ class NMEAParser:
                                 )
                             time.sleep(self.timeout)  # Ожидание перед повторной попыткой
                             continue  # Продолжить цикл, чтобы снова проверить данные
-
+                        
                         tag = line.split(',')[0].lstrip('$')
                         if tag in self.filter or len(self.filter) == 0:
-                            line = self.decode_line(line)
-                            f.write(line)
-                            print(line)
+                            if tag == old_tag:
+                                pass
+                            else:
+                                old_tag = tag
+                                line = self.decode_line(line)
+                                f.write(line)
+                                if self.print_output:
+                                    print(line)
 
                     except serial.SerialException as e:
                         print(f"Error with serial port: {e}")
@@ -297,6 +317,27 @@ class NMEAParser:
                 return f"{message_type} Template evaluation error: {str(e)}\n"
 
         return f"{message_type} Unsupported data\n"
+    
+    def _check_satellites(self, satellites: str) -> str:
+        # Разбиваем строку на части
+        satellite_ids = satellites.split(',')
+        # ID спутников находятся с 4-го по 15-й элемент (индексы 3-14)
+        # Удаляем пустые значения
+        satellite_ids = [int(sat_id) for sat_id in satellite_ids if sat_id]
+        
+        # Проверяем принадлежность к разным системам
+        has_gps = any(1 <= sat_id <= 32 for sat_id in satellite_ids)
+        has_glonass = any(65 <= sat_id <= 96 for sat_id in satellite_ids)
+        
+        # Возвращаем результат
+        if has_gps and has_glonass:
+            return "GPS+GLONASS"
+        elif has_gps:
+            return "GPS"
+        elif has_glonass:
+            return "GLOANASS"
+        else:
+            return "n"
 
 
 def start_app() -> None:
