@@ -99,17 +99,145 @@ class NMEAParser:
         self.timeout = timeout
         # Буфер для хранения данных текущего цикла
         self.current_cycle = {
-            "$GNGGA": None,
-            "$GNGSA": None,
-            "$GNRMC": None
+            "$GNGGA": None,  # время, широта, долгота
+            "$GNGSA": None,  # спутники
+            "$GPGSV": None,  # GPS спутники (запасной вариант)
+            "$GLGSV": None,  # GLONASS спутники (запасной вариант)
+            "$GNVTG": None,  # скорость
         }
         self.print_output = True
-        self.message_processors = {
-            "$GNRMC": self._process_gnrmc,
+
+    def _convert_to_decimal(self, coord: str, direction: str) -> str:
+        """Конвертирует координаты из формата NMEA в десятичные градусы."""
+        try:
+            if not coord or not direction:
+                return 'n'
+            
+            # Для широты первые 2 цифры градусы, для долготы первые 3
+            if len(coord.split('.')[0]) >= 5:  # долгота
+                degrees = float(coord[:3])
+                minutes = float(coord[3:])
+            else:  # широта
+                degrees = float(coord[:2])
+                minutes = float(coord[2:])
+            
+            print(degrees, minutes)
+            # 5544.82475, 03739.73181
+            decimal = degrees + (minutes/60)
+            # Отрицательные значения для W и S
+            if direction in ['W', 'S']:
+                decimal = -decimal
+            
+            return f"{decimal:.6f}"
+        except:
+            return 'n'
+
+    def _process_gngga(self, data_list: list) -> dict:
+        """Обработка GNGGA сообщений."""
+        try:
+            time = data_list[1] if len(data_list) > 1 else ''
+            latitude = data_list[2] if len(data_list) > 2 else ''
+            lat_dir = data_list[3] if len(data_list) > 3 else ''
+            longitude = data_list[4] if len(data_list) > 4 else ''
+            lon_dir = data_list[5] if len(data_list) > 5 else ''
+            
+            # Форматируем время в формат ЧЧ:ММ:СС
+            if time:
+                time = time.split('.')[0]
+                time = [time[i:i+2] for i in range(0, len(time), 2)]
+                time = ':'.join(time)
+            
+            return {
+                "time": time if time else 'n',
+                "latitude": self._convert_to_decimal(latitude, lat_dir),
+                "longitude": self._convert_to_decimal(longitude, lon_dir)
+            }
+        except Exception as e:
+            return {"time": "n", "latitude": "n", "longitude": "n"}
+
+    def _process_gngsa(self, data_list: list) -> dict:
+        """Обработка GNGSA сообщений."""
+        try:
+            satellites = data_list[3:15]
+            has_gps = any(1 <= int(sat) <= 32 for sat in satellites if sat)
+            has_glonass = any(65 <= int(sat) <= 96 for sat in satellites if sat)
+            
+            if has_gps and has_glonass:
+                return {"system": "GPS+GLONASS"}
+            elif has_gps:
+                return {"system": "GPS"}
+            elif has_glonass:
+                return {"system": "GLONASS"}
+            return {"system": "n"}
+        except Exception as e:
+            return {"system": "n"}
+
+    def _process_gsv(self, message_type: str) -> dict:
+        """Обработка GSV сообщений."""
+        if message_type == "$GPGSV":
+            return {"system": "GPS"}
+        elif message_type == "$GLGSV":
+            return {"system": "GLONASS"}
+        return {"system": "n"}
+
+    def _process_gnvtg(self, data_list: list) -> dict:
+        """Обработка GNVTG сообщений."""
+        try:
+            speed_kmh = data_list[7] if len(data_list) > 7 else ''
+            return {"speed": speed_kmh if speed_kmh else 'n'}
+        except Exception as e:
+            return {"speed": "n"}
+
+    def _format_output_line(self) -> str:
+        """Форматирует строку вывода из собранных данных."""
+        gga_data = self.current_cycle["$GNGGA"] or {"time": "n", "latitude": "n", "longitude": "n"}
+        
+        # Приоритет систем: GNGSA > GPGSV/GLGSV
+        system = "n"
+        if self.current_cycle["$GNGSA"] and self.current_cycle["$GNGSA"]["system"] != "n":
+            system = self.current_cycle["$GNGSA"]["system"]
+        elif self.current_cycle["$GPGSV"] and self.current_cycle["$GLGSV"]:
+            system = "GPS+GLONASS"
+        elif self.current_cycle["$GPGSV"]:
+            system = "GPS"
+        elif self.current_cycle["$GLGSV"]:
+            system = "GLONASS"
+        
+        speed_data = self.current_cycle["$GNVTG"] or {"speed": "n"}
+        
+        return f"{gga_data['time']}\t{gga_data['latitude']}\t{gga_data['longitude']}\t{system}\t{speed_data['speed']}\n"
+
+    def _check_cycle_complete(self) -> bool:
+        """Проверяет, завершен ли текущий цикл сбора данных."""
+        required_messages = ["$GNGGA", "$GNVTG"]
+        # Проверяем наличие обязательных сообщений
+        if not all(self.current_cycle[msg] for msg in required_messages):
+            return False
+        # Проверяем наличие информации о спутниках
+        has_satellites = (
+            (self.current_cycle["$GNGSA"] and self.current_cycle["$GNGSA"]["system"] != "n") or
+            self.current_cycle["$GPGSV"] or
+            self.current_cycle["$GLGSV"]
+        )
+        return has_satellites
+
+    def _process_message(self, message_type: str, data_list: list) -> None:
+        """Обрабатывает сообщение и добавляет его в текущий цикл."""
+        processors = {
             "$GNGGA": self._process_gngga,
-            "$GNGSA": self._process_gngsa
+            "$GNGSA": self._process_gngsa,
+            "$GNVTG": self._process_gnvtg,
         }
-    
+        
+        if message_type in processors:
+            self.current_cycle[message_type] = processors[message_type](data_list)
+        elif message_type in ["$GPGSV", "$GLGSV"]:
+            self.current_cycle[message_type] = self._process_gsv(message_type)
+
+    def _reset_cycle(self) -> None:
+        """Сбрасывает текущий цикл."""
+        self.current_cycle = {key: None for key in self.current_cycle}
+
     def start(self) -> None:
         if self.input:
             self.output_lines = []
@@ -183,89 +311,6 @@ class NMEAParser:
                 if self.print_output:
                     print("Connection closed")
 
-    def _process_gnrmc(self, data_list: list) -> dict:
-        """Обработка GNRMC сообщений."""
-        try:
-            speed = data_list[7] if len(data_list) > 7 else ''
-            return {"speed": speed if speed else 'n'}
-        except Exception as e:
-            return {"speed": "n"}
-
-    def _process_gngsa(self, data_list: list) -> dict:
-        """Обработка GNGSA сообщений."""
-        try:
-            satellites = data_list[3:15]
-            has_gps = any(1 <= int(sat) <= 32 for sat in satellites if sat)
-            has_glonass = any(65 <= int(sat) <= 96 for sat in satellites if sat)
-            
-            if has_gps and has_glonass:
-                return {"system": "GPS+GLONASS"}
-            elif has_gps:
-                return {"system": "GPS"}
-            elif has_glonass:
-                return {"system": "GLONASS"}
-            return {"system": "n"}
-        except Exception as e:
-            return {"system": "n"}
-    
-    def _process_gngga(self, data_list: list) -> dict:
-        """Обработка GNGGA сообщений."""
-        try:
-            time = data_list[1] if len(data_list) > 1 else ''
-            latitude = data_list[2] if len(data_list) > 2 else ''
-            longitude = data_list[4] if len(data_list) > 4 else ''
-            error = data_list[8] if len(data_list) > 8 else ''
-            
-            # Форматируем время в формат ЧЧ:ММ:СС
-            if time:
-                time = time.split('.')[0]  # Убираем миллисекунды
-                time = [time[i:i+2] for i in range(0, len(time), 2)]  # Разбиваем на части
-                time = ':'.join(time)  # Соединяем с разделителем
-            if longitude:
-                degree = int(longitude[:3])
-                minute = float(longitude[3:])
-                longitude = degree + (minute / 60)
-            if latitude:
-                degree = int(latitude[:2])
-                minute = float(latitude[2:])
-                latitude = degree + (minute / 60)
-            return {
-                "time": time if time else 'n',
-                "latitude": f"{latitude:.3f}" if latitude else 'n',
-                "longitude": f"{longitude:.3f}" if longitude else 'n',
-                "error": error if error else 'n'
-            }
-        except Exception as e:
-            print(e)
-            return {"time": "n", "latitude": "n", "longitude": "n", "error": "n"}
-
-    def _format_output_line(self) -> str:
-        """Форматирует строку вывода из собранных данных."""
-        gga_data = self.current_cycle["$GNGGA"] or {"time": "n", "latitude": "n", "longitude": "n", "error": "n"}
-        gsa_data = self.current_cycle["$GNGSA"] or {"system": "n"}
-        rmc_data = self.current_cycle["$GNRMC"] or {"speed": "n"}
-        
-        return f"{gga_data['time']}\t{gga_data['latitude']}\t{gga_data['longitude']}\t{gga_data['error']}\t{gsa_data['system']}\t{rmc_data['speed']}\n"
-
-    def _process_message(self, message_type: str, data_list: list) -> None:
-        """Обрабатывает сообщение и добавляет его в текущий цикл."""
-        processors = {
-            "$GNGGA": self._process_gngga,
-            "$GNGSA": self._process_gngsa,
-            "$GNRMC": self._process_gnrmc
-        }
-        
-        if message_type in processors:
-            self.current_cycle[message_type] = processors[message_type](data_list)
-
-    def _check_cycle_complete(self) -> bool:
-        """Проверяет, завершен ли текущий цикл сбора данных."""
-        return all(data is not None for data in self.current_cycle.values())
-
-    def _reset_cycle(self) -> None:
-        """Сбрасывает текущий цикл."""
-        self.current_cycle = {key: None for key in self.current_cycle}
-
     def decode_line(self, line: str) -> str:
         """Декодирует строку NMEA и возвращает форматированный результат."""
         if '*' not in line:
@@ -291,7 +336,6 @@ class NMEAParser:
         if self._check_cycle_complete():
             output_line = self._format_output_line()
             self._reset_cycle()
-            print(output_line)
             return output_line
 
         return ""
