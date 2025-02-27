@@ -1,5 +1,8 @@
-pyloggernmea (0.0.1) unstable; urgency=low
+pyloggernmea (0.0.2) unstable; urgency=low
 
-  * Initial release.
+  * Цикличная обработка данных.
+  * Новый формат вывода.
+  * Исправлены ошибки.
+  * Убран template.
 
- -- Rinapy <roma.minaev0@gmail.com>  Thu, 13 Feb 2025 12:00:00 +0300
+ -- Rinapy <roma.minaev0@gmail.com>  Thu, 27 Feb 2025 12:00:00 +0300

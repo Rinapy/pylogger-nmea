@@ -10,7 +10,6 @@ else:
 
 import serial
 
-from .line_parser import LineParser
 
 # Получить абсолютный путь к текущему скрипту
 script_path = os.path.abspath(__file__)
@@ -48,13 +47,6 @@ def parse_args() -> Namespace:
         default="logfile.log",
         help="Output file",
     )
-    parser.add_argument(
-        "-f",
-        "--filter",
-        nargs='+',
-        default=[],
-        help="Filter messages by type",
-    )
 
     parser.add_argument(
         "-t",
@@ -64,21 +56,6 @@ def parse_args() -> Namespace:
         help="Timeout in seconds for attempt to reconnect to the port",
     )
 
-    parser.add_argument(
-        "-tp",
-        "--template_path",
-        type=str,
-        default=None,
-        help="Path to the template file",
-    )
-    
-    parser.add_argument(
-        "-po",
-        "--print_output",
-        type=bool,
-        default=True,
-        help="Print output to console",
-    )
     if daemon:
         parser.add_argument(
             "-d",
@@ -112,90 +89,27 @@ class NMEAParser:
         port: str,
         baudrate: int,
         output: str,
-        filter: list,
         input: Union[str, None] = None,
-        template_path: Union[str, None] = None,
         timeout: int = 0,
-        print_output: bool = False,
     ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.input = input
         self.output = output
-        self.filter = filter
-        self.template_path = template_path or os.path.join(os.path.dirname(script_path), "templates.json")
-        self.message_parsers = self._load_templates()
         self.timeout = timeout
-        self.print_output = print_output
-
-    def _load_templates(self) -> dict:
-        if not os.path.exists(self.template_path):
-            templates = {
-                        "$GPGGA": {
-                            "keys": ["UTC", "latitude", "longitude", "altitude", "satellites"],
-                            "indexes": ["1~truncate/0/|slice/2/|join/:/|~", 2, 4, 9, 7],
-                            "out_msg_template": "{type} UTC:{UTC} Lat:{latitude} Lon:{longitude} Alt:{altitude} Sat:{satellites}\n"
-                        },
-
-                        "$GPGSA": {
-                            "keys": ["type_mode", "mode", "satellites", "PDOP", "HDOP", "VDOP"],
-                            "indexes": [1, 2, "3:14", 15, 16, 17],
-                            "out_msg_template": "{type} Type:{type_mode} Mode:{mode} Satellites ID's:{satellites} PDOP:{PDOP} HDOP:{HDOP} VDOP:{VDOP}\n"
-                        }
-                    }
-            with open(self.template_path, 'w') as f:
-                f.write(json.dumps(templates, indent=4))
-        else:
-            with open(self.template_path, 'r') as f:
-                templates = json.load(f)
-        
-
-        # Преобразуем строковые slice в объекты slice
-        for message_type in templates:
-            indexes = templates[message_type]['indexes']
-            for i, idx in enumerate(indexes):
-                if isinstance(idx, str) and ':' in idx and '~' not in idx:
-                    start, end = map(int, idx.split(':'))
-                    indexes[i] = slice(start, end)
-
-        return templates
-
-    def _process_template(self, template: str, data: dict) -> str:
-        """Обрабатывает шаблон с условными выражениями и вызовами функций."""
-        result = template
-        import re
-        
-        # Находим все условные выражения в шаблоне
-        pattern = r"\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' or ([a-zA-Z_][a-zA-Z0-9_]*) == 0 else ([a-zA-Z_][a-zA-Z0-9_]*)\}|\{'n' if ([a-zA-Z_][a-zA-Z0-9_]*) == '' else ([a-zA-Z_][a-zA-Z0-9_]*)\}|\{([a-zA-Z_][a-zA-Z0-9_]*)\(([a-zA-Z_][a-zA-Z0-9_]*)\)\}"
-        matches = re.finditer(pattern, template)
-        
-        # Заменяем каждое условное выражение его значением
-        for match in matches:
-            if match.group(6) is not None:  # Это вызов функции
-                func_name = match.group(6)
-                param_name = match.group(7)
-                if hasattr(self, func_name) and param_name in data:
-                    func = getattr(self, func_name)
-                    try:
-                        result_value = func(data[param_name])
-                        result = result.replace(match.group(0), str(result_value))
-                    except Exception as e:
-                        print(f"Error calling function {func_name}: {e}")
-            elif match.group(1) is not None:  # Это выражение с проверкой на пустоту и 0
-                var_name = match.group(1)
-                if var_name in data:
-                    value = data[var_name]
-                    result_value = 'n' if value == '' or value == '0' or value == 0 else value
-                    result = result.replace(match.group(0), str(result_value))
-            else:  # Это выражение только с проверкой на пустоту
-                var_name = match.group(4)
-                if var_name in data:
-                    value = data[var_name]
-                    result_value = 'n' if value == '' else value
-                    result = result.replace(match.group(0), str(result_value))
-        
-        return result
-
+        # Буфер для хранения данных текущего цикла
+        self.current_cycle = {
+            "$GNGGA": None,
+            "$GNGSA": None,
+            "$GNRMC": None
+        }
+        self.print_output = True
+        self.message_processors = {
+            "$GNRMC": self._process_gnrmc,
+            "$GNGGA": self._process_gngga,
+            "$GNGSA": self._process_gngsa
+        }
+    
     def start(self) -> None:
         if self.input:
             self.output_lines = []
@@ -203,12 +117,16 @@ class NMEAParser:
                 old_tag = ''
                 for line in f:
                     tag = line.split(',')[0].lstrip('$')
-                    if tag in self.filter or len(self.filter) == 0:
-                        if tag == old_tag:
-                            pass
-                        else:
-                            old_tag = tag
-                            self.output_lines.append(self.decode_line(line))
+                    if tag == 'GNGSA':
+                        check_satellites = self._check_satellites(line.split(',')[3:15])
+                        print(check_satellites)
+                        if check_satellites == 'n':
+                            continue
+                    if tag == old_tag:
+                        pass
+                    else:
+                        old_tag = tag
+                        self.output_lines.append(self.decode_line(line))
             with open(self.output, "w") as f:
                 for line in self.output_lines:
                     f.write(line)
@@ -243,10 +161,13 @@ class NMEAParser:
                             continue  # Продолжить цикл, чтобы снова проверить данные
                         
                         tag = line.split(',')[0].lstrip('$')
-                        if tag in self.filter or len(self.filter) == 0:
-                            if tag == old_tag:
+                        if tag == 'GNGSA':
+                            check_satellites = self._check_satellites(line.split(',')[3:15])
+                            if check_satellites == 'n':
+                                continue
+                        if tag == old_tag:
                                 pass
-                            else:
+                        else:
                                 old_tag = tag
                                 line = self.decode_line(line)
                                 f.write(line)
@@ -263,68 +184,112 @@ class NMEAParser:
                 if self.print_output:
                     print("Connection closed")
 
+    def _process_gnrmc(self, data_list: list) -> dict:
+        """Обработка GNRMC сообщений."""
+        try:
+            speed = data_list[7] if len(data_list) > 7 else ''
+            return {"speed": speed if speed else 'n'}
+        except Exception as e:
+            return {"speed": "n"}
+
+    def _process_gngsa(self, data_list: list) -> dict:
+        """Обработка GNGSA сообщений."""
+        try:
+            satellites = data_list[3:15]
+            has_gps = any(1 <= int(sat) <= 32 for sat in satellites if sat)
+            has_glonass = any(65 <= int(sat) <= 96 for sat in satellites if sat)
+            
+            if has_gps and has_glonass:
+                return {"system": "GPS+GLONASS"}
+            elif has_gps:
+                return {"system": "GPS"}
+            elif has_glonass:
+                return {"system": "GLONASS"}
+            return {"system": "n"}
+        except Exception as e:
+            return {"system": "n"}
+    
+    def _process_gngga(self, data_list: list) -> dict:
+        """Обработка GNGGA сообщений."""
+        try:
+            time = data_list[1] if len(data_list) > 1 else ''
+            latitude = data_list[2] if len(data_list) > 2 else ''
+            longitude = data_list[4] if len(data_list) > 4 else ''
+            error = data_list[8] if len(data_list) > 8 else ''
+            
+            # Форматируем время в формат ЧЧ:ММ:СС
+            if time:
+                time = time.split('.')[0]  # Убираем миллисекунды
+                time = [time[i:i+2] for i in range(0, len(time), 2)]  # Разбиваем на части
+                time = ':'.join(time)  # Соединяем с разделителем
+            
+            return {
+                "time": time if time else 'n',
+                "latitude": latitude if latitude else 'n',
+                "longitude": longitude if longitude else 'n',
+                "error": error if error else 'n'
+            }
+        except Exception as e:
+            return {"time": "n", "latitude": "n", "longitude": "n", "error": "n"}
+
+    def _format_output_line(self) -> str:
+        """Форматирует строку вывода из собранных данных."""
+        gga_data = self.current_cycle["$GNGGA"] or {"time": "n", "latitude": "n", "longitude": "n", "error": "n"}
+        gsa_data = self.current_cycle["$GNGSA"] or {"system": "n"}
+        rmc_data = self.current_cycle["$GNRMC"] or {"speed": "n"}
+        
+        return f"{gga_data['time']} {gga_data['latitude']} {gga_data['longitude']} {gga_data['error']} {gsa_data['system']} {rmc_data['speed']}\n"
+
+    def _process_message(self, message_type: str, data_list: list) -> None:
+        """Обрабатывает сообщение и добавляет его в текущий цикл."""
+        processors = {
+            "$GNGGA": self._process_gngga,
+            "$GNGSA": self._process_gngsa,
+            "$GNRMC": self._process_gnrmc
+        }
+        
+        if message_type in processors:
+            self.current_cycle[message_type] = processors[message_type](data_list)
+
+    def _check_cycle_complete(self) -> bool:
+        """Проверяет, завершен ли текущий цикл сбора данных."""
+        return all(data is not None for data in self.current_cycle.values())
+
+    def _reset_cycle(self) -> None:
+        """Сбрасывает текущий цикл."""
+        self.current_cycle = {key: None for key in self.current_cycle}
+
     def decode_line(self, line: str) -> str:
-        # Проверяем наличие контрольной суммы
+        """Декодирует строку NMEA и возвращает форматированный результат."""
         if '*' not in line:
-            return "Invalid message: no checksum\n"
+            return ""
 
         message, checksum = line.rsplit('*', 1)
-
+        
         # Вычисляем контрольную сумму
         calculated_checksum = 0
-        for char in message[1:]:  # Пропускаем начальный символ '$'
+        for char in message[1:]:
             calculated_checksum ^= ord(char)
-
-        # Сравниваем с полученной контрольной суммой
+            
         if format(calculated_checksum, '02X') != checksum.strip():
-            return (
-                f"Invalid message: checksum mismatch "
-                f"(calculated: {format(calculated_checksum, '02X')}, "
-                f"received: {checksum.strip()})\n"
-            )
+            return ""
 
         data_list = message.split(",")
-        data = {}
         message_type = data_list[0]
 
-        if message_type in self.message_parsers:
-            parser = self.message_parsers[message_type]
-            for key, idx in zip(parser["keys"], parser["indexes"]):
-                if isinstance(idx, slice):
-                    data[key] = ",".join(data_list[idx])
-                elif isinstance(idx, str) and '~' in idx:
-                    idx, operation = int(idx.split('~')[0]), idx.split('~')[1]
-                    data[key] = LineParser(data_list[idx], operation).parse()
-                else:
-                    try:
-                        data[key] = data_list[idx]
-                    except IndexError:
-                        return f"{message_type} Template error, index {idx} for tag {key} is out of range\n"
-            data["type"] = message_type
-            
-            # Обработка условных выражений в шаблоне
-            template = parser["out_msg_template"]
-            try:
-                # Сначала обрабатываем условные выражения
-                processed_template = self._process_template(template, data)
-                # Затем применяем стандартное форматирование
-                result = processed_template.format(**data)
-                return result
-            except KeyError as e:
-                return f"{message_type} Template error: missing key {str(e)}\n"
-            except Exception as e:
-                return f"{message_type} Template evaluation error: {str(e)}\n"
+        # Обрабатываем сообщение
+        self._process_message(message_type, data_list)
 
-        return f"{message_type} Unsupported data\n"
+        # Если цикл завершен, форматируем вывод и сбрасываем цикл
+        if self._check_cycle_complete():
+            output_line = self._format_output_line()
+            self._reset_cycle()
+            return output_line
+
+        return ""
     
-    def _check_satellites(self, satellites: str) -> str:
-        # Разбиваем строку на части
-        satellite_ids = satellites.split(',')
-        # ID спутников находятся с 4-го по 15-й элемент (индексы 3-14)
-        # Удаляем пустые значения
-        satellite_ids = [int(sat_id) for sat_id in satellite_ids if sat_id]
-        
-        # Проверяем принадлежность к разным системам
+    def _check_satellites(self, satellites: list) -> str:
+        satellite_ids = [int(sat_id) for sat_id in satellites if sat_id]
         has_gps = any(1 <= sat_id <= 32 for sat_id in satellite_ids)
         has_glonass = any(65 <= sat_id <= 96 for sat_id in satellite_ids)
         
@@ -341,7 +306,7 @@ class NMEAParser:
 
 def start_app() -> None:
     args = parse_args()
-    print(f'Logger args:\n - Port: {args.port}\n - Baudrate: {args.baudrate}\n - Output: {args.output}\n - Filter: {"All" if args.filter == "" else args.filter}\n - Input: {args.input}\n - Timeout: {args.timeout}\n - Print output: {args.print_output}')
+    print(f'Logger args:\n - Port: {args.port}\n - Baudrate: {args.baudrate}\n - Output: {args.output}\n - Input: {args.input}\n - Timeout: {args.timeout}\n')
 
     if daemon and args.daemon:
         with daemon.DaemonContext(): 
@@ -351,11 +316,8 @@ def start_app() -> None:
                 args.port,
                 args.baudrate,
                 args.output,
-                args.filter,
                 args.input,
-                args.template_path,
                 args.timeout,
-                args.print_output
             )
             parser.start()
     else:
@@ -363,11 +325,8 @@ def start_app() -> None:
             args.port,
             args.baudrate,
             args.output,
-            args.filter,
             args.input,
-            args.template_path,
             args.timeout,
-            args.print_output
         )
         parser.start()
 
