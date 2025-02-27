@@ -139,6 +139,7 @@ class NMEAParser:
             lat_dir = data_list[3] if len(data_list) > 3 else ''
             longitude = data_list[4] if len(data_list) > 4 else ''
             lon_dir = data_list[5] if len(data_list) > 5 else ''
+            hdop = data_list[8] if len(data_list) > 8 else ''
             
             # Форматируем время в формат ЧЧ:ММ:СС
             if time:
@@ -149,10 +150,11 @@ class NMEAParser:
             return {
                 "time": time if time else 'n',
                 "latitude": self._convert_to_decimal(latitude, lat_dir),
-                "longitude": self._convert_to_decimal(longitude, lon_dir)
+                "longitude": self._convert_to_decimal(longitude, lon_dir),
+                "hdop": hdop if hdop else 'n'
             }
         except Exception as e:
-            return {"time": "n", "latitude": "n", "longitude": "n"}
+            return {"time": "n", "latitude": "n", "longitude": "n", "hdop": "n"}
 
     def _process_gngsa(self, data_list: list) -> dict:
         """Обработка GNGSA сообщений."""
@@ -189,7 +191,7 @@ class NMEAParser:
 
     def _format_output_line(self) -> str:
         """Форматирует строку вывода из собранных данных."""
-        gga_data = self.current_cycle["$GNGGA"] or {"time": "n", "latitude": "n", "longitude": "n"}
+        gga_data = self.current_cycle["$GNGGA"] or {"time": "n", "latitude": "n", "longitude": "n", "hdop": "n"}
         
         # Приоритет систем: GNGSA > GPGSV/GLGSV
         system = "n"
@@ -204,7 +206,7 @@ class NMEAParser:
         
         speed_data = self.current_cycle["$GNVTG"] or {"speed": "n"}
         
-        return f"{gga_data['time']}\t{gga_data['latitude']}\t{gga_data['longitude']}\t{system}\t{speed_data['speed']}\n"
+        return f"{gga_data['time']}\t{gga_data['latitude']}\t{gga_data['longitude']}\t{gga_data['hdop']}\t{system}\t{speed_data['speed']}\n"
 
     def _check_cycle_complete(self) -> bool:
         """Проверяет, завершен ли текущий цикл сбора данных."""
