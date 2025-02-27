@@ -121,7 +121,6 @@ class NMEAParser:
                 degrees = float(coord[:2])
                 minutes = float(coord[2:])
             
-            print(degrees, minutes)
             # 5544.82475, 03739.73181
             decimal = degrees + (minutes/60)
             # Отрицательные значения для W и S
@@ -242,18 +241,9 @@ class NMEAParser:
         if self.input:
             self.output_lines = []
             with open(self.input, "r") as f:
-                old_tag = ''
+                
                 for line in f:
-                    tag = line.split(',')[0].lstrip('$')
-                    if tag == 'GNGSA':
-                        check_satellites = self._check_satellites(line.split(',')[3:15])
-                        if check_satellites == 'n':
-                            continue
-                    if tag == old_tag:
-                        pass
-                    else:
-                        old_tag = tag
-                        self.output_lines.append(self.decode_line(line))
+                    self.output_lines.append(self.decode_line(line))
             with open(self.output, "w") as f:
                 for line in self.output_lines:
                     f.write(line)
@@ -273,7 +263,6 @@ class NMEAParser:
 
 
             with open(self.output, "a") as f:
-                old_tag = ''
                 while True:
                     try:
             
@@ -287,19 +276,10 @@ class NMEAParser:
                             time.sleep(self.timeout)  # Ожидание перед повторной попыткой
                             continue  # Продолжить цикл, чтобы снова проверить данные
                         
-                        tag = line.split(',')[0].lstrip('$')
-                        if tag == 'GNGSA':
-                            check_satellites = self._check_satellites(line.split(',')[3:15])
-                            if check_satellites == 'n':
-                                continue
-                        if tag == old_tag:
-                                pass
-                        else:
-                            old_tag = tag
-                            line = self.decode_line(line)
-                            f.write(line)
-                            if self.print_output and line != "":
-                                print(line)
+                        line = self.decode_line(line)
+                        f.write(line)
+                        if self.print_output and line != "":
+                            print(line)
 
                     except serial.SerialException as e:
                         print(f"Error with serial port: {e}")
