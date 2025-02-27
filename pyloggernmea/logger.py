@@ -221,14 +221,22 @@ class NMEAParser:
                 time = time.split('.')[0]  # Убираем миллисекунды
                 time = [time[i:i+2] for i in range(0, len(time), 2)]  # Разбиваем на части
                 time = ':'.join(time)  # Соединяем с разделителем
-            
+            if longitude:
+                degree = int(longitude[:3])
+                minute = float(longitude[3:])
+                longitude = degree + (minute / 60)
+            if latitude:
+                degree = int(latitude[:2])
+                minute = float(latitude[2:])
+                latitude = degree + (minute / 60)
             return {
                 "time": time if time else 'n',
-                "latitude": latitude if latitude else 'n',
-                "longitude": longitude if longitude else 'n',
+                "latitude": f"{latitude:.3f}" if latitude else 'n',
+                "longitude": f"{longitude:.3f}" if longitude else 'n',
                 "error": error if error else 'n'
             }
         except Exception as e:
+            print(e)
             return {"time": "n", "latitude": "n", "longitude": "n", "error": "n"}
 
     def _format_output_line(self) -> str:
