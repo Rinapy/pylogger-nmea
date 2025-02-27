@@ -119,7 +119,6 @@ class NMEAParser:
                     tag = line.split(',')[0].lstrip('$')
                     if tag == 'GNGSA':
                         check_satellites = self._check_satellites(line.split(',')[3:15])
-                        print(check_satellites)
                         if check_satellites == 'n':
                             continue
                     if tag == old_tag:
@@ -168,11 +167,11 @@ class NMEAParser:
                         if tag == old_tag:
                                 pass
                         else:
-                                old_tag = tag
-                                line = self.decode_line(line)
-                                f.write(line)
-                                if self.print_output:
-                                    print(line)
+                            old_tag = tag
+                            line = self.decode_line(line)
+                            f.write(line)
+                            if self.print_output and line != "":
+                                print(line)
 
                     except serial.SerialException as e:
                         print(f"Error with serial port: {e}")
@@ -238,7 +237,7 @@ class NMEAParser:
         gsa_data = self.current_cycle["$GNGSA"] or {"system": "n"}
         rmc_data = self.current_cycle["$GNRMC"] or {"speed": "n"}
         
-        return f"{gga_data['time']} {gga_data['latitude']} {gga_data['longitude']} {gga_data['error']} {gsa_data['system']} {rmc_data['speed']}\n"
+        return f"{gga_data['time']}\t{gga_data['latitude']}\t{gga_data['longitude']}\t{gga_data['error']}\t{gsa_data['system']}\t{rmc_data['speed']}\n"
 
     def _process_message(self, message_type: str, data_list: list) -> None:
         """Обрабатывает сообщение и добавляет его в текущий цикл."""
@@ -284,6 +283,7 @@ class NMEAParser:
         if self._check_cycle_complete():
             output_line = self._format_output_line()
             self._reset_cycle()
+            print(output_line)
             return output_line
 
         return ""
