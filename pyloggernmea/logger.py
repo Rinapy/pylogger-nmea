@@ -298,6 +298,7 @@ class NMEAParser:
 
                         line = self.decode_line(line)
                         f.write(line)
+                        f.flush()
                         if self.print_output and line != "":
                             print(line)
 
