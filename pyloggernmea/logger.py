@@ -139,9 +139,7 @@ class NMEAParser:
             if date_string:
                 date = f"{date_string[:2]}.{date_string[2:4]}.{date_string[4:]}"
         except Exception as e:
-            print(e)
             return {'date': "n"}
-        print(date)
         return {"date": date}
 
     def _process_gngga(self, data_list: list) -> dict:
