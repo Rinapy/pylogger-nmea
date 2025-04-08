@@ -135,10 +135,9 @@ class NMEAParser:
 
     def _process_gnrmc(self, data_list: list) -> dict:
         try:
-            date = data_list[9] if len(data_list) > 1 else ''
-            if date:
-                date = [date[i:i+2] for i in range(0, len(date), 2)]
-                date = '.'.join(time)
+            date_string = data_list[9] if len(data_list) > 1 else ''
+            if date_string:
+                date = f"{date_string[:2]}.{date_string[2:4]}.{date_string[4:]}"
         except Exception as e:
             print(e)
             return {'date': "n"}
