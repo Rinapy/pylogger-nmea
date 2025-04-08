@@ -140,7 +140,7 @@ class NMEAParser:
                 date_string = f"{date_string[:2]}.{date_string[2:4]}.{date_string[4:]}"
         except Exception as e:
             return {'date': "n"}
-        return {"date": date_string if hdop else 'n'}
+        return {"date": date_string if date_string else 'n'}
 
     def _process_gngga(self, data_list: list) -> dict:
         """Обработка GNGGA сообщений."""
