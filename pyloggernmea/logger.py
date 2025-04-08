@@ -137,10 +137,10 @@ class NMEAParser:
         try:
             date_string = data_list[9] if len(data_list) > 1 else ''
             if date_string:
-                date = f"{date_string[:2]}.{date_string[2:4]}.{date_string[4:]}"
+                date_string = f"{date_string[:2]}.{date_string[2:4]}.{date_string[4:]}"
         except Exception as e:
             return {'date': "n"}
-        return {"date": date}
+        return {"date": date_string}
 
     def _process_gngga(self, data_list: list) -> dict:
         """Обработка GNGGA сообщений."""
