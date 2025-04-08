@@ -136,12 +136,13 @@ class NMEAParser:
     def _process_gnrmc(self, data_list: list) -> dict:
         try:
             date = data_list[9] if len(data_list) > 1 else ''
-            print(f"Дата {date}, данные {data_list}")
             if date:
                 date = [date[i:i+2] for i in range(0, len(date), 2)]
                 date = '.'.join(time)
-        except Exception:
+        except Exception as e:
+            print(e)
             return {'date': "n"}
+        print(date)
         return {"date": date}
 
     def _process_gngga(self, data_list: list) -> dict:
